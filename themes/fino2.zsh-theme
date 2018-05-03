@@ -21,31 +21,17 @@ function box_name {
 }
 
 function go_version {
-  /usr/local/go/bin/go version | grep -o -E '\d.\d+'
+  /usr/local/go/bin/go version | grep -o -E '\d+.\d+.\d+'
 }
 
-function kubes_env {
-  env | grep KUBE_TARGET | sed 's/KUBE_TARGET=//'
-}
+# function kubes_env {
+#   env | grep KUBE_TARGET | sed 's/KUBE_TARGET=//'
+# }
 
-function deis_env {
-  deis whoami &> /dev/null
-  if [ $? -eq 0 ]
-  then
-    deis whoami | grep -o -E 'deis.*'
-  else
-    echo 'none'
-  fi
-}
 
-function deis_user {
-  deis whoami &> /dev/null
-  if [ $? -eq 0 ]
-  then
-    deis whoami | cut -d' ' -f3
-  else
-    echo 'none'
-  fi
+
+function az_sub {
+  az account show | jq .name | tr -d '"'
 }
 
 prompt_status() {
@@ -58,26 +44,37 @@ prompt_status() {
   [[ -n "$symbols" ]] && prompt_segment black default "$symbols"
 }
 
-local ruby_env=''
-if which rvm-prompt &> /dev/null; then
-  ruby_env=' %{$FG[243]%}‹ruby:$(rvm-prompt i v g)›%{$reset_color%}'
-else
-  if which rbenv &> /dev/null; then
-    ruby_env=' %{$FG[243]%}‹ruby:$(rbenv version-name)›%{$reset_color%}'
+function hcp_env() {
+  if [[ -n "${REGION}" && -n "${CLUSTER}" ]]; then
+    echo "%{$FG[120]%}[hcp:${REGION}@${CLUSTER}]%{$reset_color%}"
+  else
+    echo ""
   fi
-fi
+}
+
+function kube_env() {
+  if [[ -n "${REGION}" && -n "${CLUSTER}" ]]; then
+    if [ "$(echo ${KUBECONFIG} | sed 's/.*\///')" != "kubeconfig" ]; then
+      echo "%{$FG[160]%}[k8s:$(echo ${KUBECONFIG} | sed 's/.*\///')]%{$reset_color%}"
+      return
+    fi
+  fi
+  echo "%{$FG[160]%}[k8s:${KUBE_TARGET}]%{$reset_color%}"
+}
 
 local current_dir='${PWD/#$HOME/~}'
 local git_info='$(git_prompt_info)'
 local prompt_char='$(prompt_char)'
 
 go_ver=' %{$FG[243]%}‹go:$(go_version)›%{$reset_color%}'
-kubes_env='%{$FG[160]%}[k8s:$(kubes_env)]%{$reset_color%}'
-deis='%{$FG[129]%}[$(deis_user)@$(deis_env)]'
+kubes_env='$(kube_env)'
+env='$(hcp_env)'
+# deis='%{$FG[129]%}[$(deis_user)@$(deis_env)]'
+# sub='%{$FG[129]%}[$(az_sub)]'
 
 # %{$FG[239]%}at%{$reset_color%} %{$FG[033]%}$(box_name)%{$reset_color%}
 
-PROMPT="╭─%{$FG[040]%}%n%{$reset_color%} ${kubes_env} ${deis} %{$FG[239]%}in%{$reset_color%} %{$terminfo[bold]$FG[226]%}${current_dir}%{$reset_color%}${git_info} %{$FG[239]%}using${go_ver}
+PROMPT="╭─%{$FG[040]%}%n%{$reset_color%} ${kubes_env} ${env} %{$FG[239]%}in%{$reset_color%} %{$terminfo[bold]$FG[226]%}${current_dir}%{$reset_color%}${git_info} %{$FG[239]%}using${go_ver}
 ╰─${last_exit_code}${prompt_char}%{$reset_color%}"
 
 ZSH_THEME_GIT_PROMPT_PREFIX=" %{$FG[239]%}on%{$reset_color%} %{$fg[255]%}"
